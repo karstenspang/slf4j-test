@@ -11,11 +11,12 @@ import org.junit.runner.RunWith;
 import org.powermock.core.classloader.annotations.PrepareForTest;
 import org.powermock.modules.junit4.PowerMockRunner;
 
-import uk.org.lidalia.slf4jext.Level;
+import org.slf4j.event.Level;
 
 import static java.util.Arrays.asList;
 import static org.hamcrest.CoreMatchers.instanceOf;
 import static org.hamcrest.CoreMatchers.is;
+import static org.hamcrest.Matchers.nullValue;
 import static org.hamcrest.collection.IsEmptyCollection.empty;
 import static org.junit.Assert.assertNotSame;
 import static org.junit.Assert.assertSame;
@@ -23,7 +24,7 @@ import static org.junit.Assert.assertThat;
 import static org.powermock.api.mockito.PowerMockito.mock;
 import static org.powermock.api.mockito.PowerMockito.when;
 import static org.powermock.api.mockito.PowerMockito.whenNew;
-import static uk.org.lidalia.slf4jext.Level.WARN;
+import static org.slf4j.event.Level.WARN;
 import static uk.org.lidalia.slf4jtest.LoggingEvent.debug;
 import static uk.org.lidalia.slf4jtest.LoggingEvent.info;
 import static uk.org.lidalia.slf4jtest.LoggingEvent.trace;
@@ -262,7 +263,7 @@ public class TestLoggerFactoryTests {
 
     @Test
     public void defaultPrintLevelIsOff() {
-        assertThat(TestLoggerFactory.getInstance().getPrintLevel(), is(Level.OFF));
+        assertThat(TestLoggerFactory.getInstance().getPrintLevel(), is(nullValue()));
     }
 
     @Test
@@ -310,7 +311,7 @@ public class TestLoggerFactoryTests {
     public void resetLoggerFactory() {
         try {
             TestLoggerFactory.reset();
-            TestLoggerFactory.getInstance().setPrintLevel(Level.OFF);
+            TestLoggerFactory.getInstance().setPrintLevel(null);
         } catch (IllegalStateException e) {
             // ignore
         }

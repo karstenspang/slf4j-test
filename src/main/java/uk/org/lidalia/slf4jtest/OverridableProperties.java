@@ -4,12 +4,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.Properties;
 
-import com.google.common.base.Function;
-import com.google.common.base.Optional;
-
-import static com.google.common.base.Optional.fromNullable;
-import static uk.org.lidalia.lang.Exceptions.throwUnchecked;
-
 class OverridableProperties {
     private static final Properties EMPTY_PROPERTIES = new Properties();
     private final String propertySourceName;
@@ -21,25 +15,23 @@ class OverridableProperties {
     }
 
     private Properties getProperties() throws IOException {
-        final Optional<InputStream> resourceAsStream = fromNullable(Thread.currentThread().getContextClassLoader()
-                .getResourceAsStream(propertySourceName + ".properties"));
-        return resourceAsStream.transform(loadProperties).or(EMPTY_PROPERTIES);
+       InputStream stream = Thread.currentThread().getContextClassLoader()
+            .getResourceAsStream(propertySourceName + ".properties");
+        if (stream==null) return EMPTY_PROPERTIES;
+        return loadProperties(stream);
     }
 
-    private static final Function<InputStream, Properties> loadProperties = new Function<InputStream, Properties>() {
-        @Override
-        public Properties apply(final InputStream propertyResource) {
-            try (InputStream closablePropertyResource = propertyResource) {
-                final Properties loadedProperties = new Properties();
-                loadedProperties.load(closablePropertyResource);
-                return loadedProperties;
-            } catch (IOException ioException) {
-                return throwUnchecked(ioException, null);
-            }
+    private static Properties loadProperties(final InputStream propertyResource)
+        throws IOException
+    {
+        try (InputStream closablePropertyResource = propertyResource) {
+            final Properties loadedProperties = new Properties();
+            loadedProperties.load(closablePropertyResource);
+            return loadedProperties;
         }
-    };
+    }
 
-    String getProperty(final String propertyKey, final String defaultValue) {
+    public String getProperty(final String propertyKey, final String defaultValue) {
         final String propertyFileProperty = properties.getProperty(propertyKey, defaultValue);
         return System.getProperty(propertySourceName + "." + propertyKey, propertyFileProperty);
     }

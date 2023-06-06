@@ -1,26 +1,27 @@
 package uk.org.lidalia.slf4jtest;
 
 import java.io.PrintStream;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
-
-import org.joda.time.Instant;
+import java.util.NoSuchElementException;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import org.slf4j.Marker;
+import org.slf4j.event.Level;
 import org.slf4j.helpers.MessageFormatter;
 
-import com.google.common.base.Function;
-import com.google.common.base.Optional;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
-
-import uk.org.lidalia.lang.Identity;
-import uk.org.lidalia.lang.RichObject;
-import uk.org.lidalia.slf4jext.Level;
-
-import static com.google.common.base.Optional.absent;
-import static com.google.common.base.Optional.fromNullable;
-import static com.google.common.base.Preconditions.checkNotNull;
-import static com.google.common.collect.FluentIterable.from;
+import static java.util.Optional.empty;
+import static java.util.Optional.ofNullable;
+import static java.util.Objects.requireNonNull;
 import static java.util.Arrays.asList;
 
 /**
@@ -46,7 +47,7 @@ import static java.util.Arrays.asList;
  * </p>
  */
 @SuppressWarnings({ "PMD.ExcessivePublicCount", "PMD.TooManyMethods" })
-public class LoggingEvent extends RichObject {
+public class LoggingEvent {
 
     public static LoggingEvent trace(final String message, final Object... arguments) {
         return new LoggingEvent(Level.TRACE, message, arguments);
@@ -249,27 +250,27 @@ public class LoggingEvent extends RichObject {
     }
 
     public LoggingEvent(final Level level, final String message, final Object... arguments) {
-        this(level, Collections.<String, String>emptyMap(), Optional.<Marker>absent(), Optional.<Throwable>absent(),
+        this(level, Collections.<String, String>emptyMap(), Optional.<Marker>empty(), Optional.<Throwable>empty(),
                 message, arguments);
     }
 
     public LoggingEvent(final Level level, final Throwable throwable, final String message, final Object... arguments) {
-        this(level, Collections.<String, String>emptyMap(), Optional.<Marker>absent(), fromNullable(throwable),
+        this(level, Collections.<String, String>emptyMap(), Optional.<Marker>empty(), ofNullable(throwable),
                 message, arguments);
     }
 
     public LoggingEvent(final Level level, final Marker marker, final String message, final Object... arguments) {
-        this(level, Collections.<String, String>emptyMap(), fromNullable(marker), Optional.<Throwable>absent(),
+        this(level, Collections.<String, String>emptyMap(), ofNullable(marker), Optional.<Throwable>empty(),
                 message, arguments);
     }
 
     public LoggingEvent(
             final Level level, final Marker marker, final Throwable throwable, final String message, final Object... arguments) {
-        this(level, Collections.<String, String>emptyMap(), fromNullable(marker), fromNullable(throwable), message, arguments);
+        this(level, Collections.<String, String>emptyMap(), ofNullable(marker), ofNullable(throwable), message, arguments);
     }
 
     public LoggingEvent(final Level level, final Map<String, String> mdc, final String message, final Object... arguments) {
-        this(level, mdc, Optional.<Marker>absent(), Optional.<Throwable>absent(), message, arguments);
+        this(level, mdc, Optional.<Marker>empty(), Optional.<Throwable>empty(), message, arguments);
     }
 
     public LoggingEvent(
@@ -278,7 +279,7 @@ public class LoggingEvent extends RichObject {
             final Throwable throwable,
             final String message,
             final Object... arguments) {
-        this(level, mdc, Optional.<Marker>absent(), fromNullable(throwable), message, arguments);
+        this(level, mdc, Optional.<Marker>empty(), ofNullable(throwable), message, arguments);
     }
 
     public LoggingEvent(
@@ -287,7 +288,7 @@ public class LoggingEvent extends RichObject {
             final Marker marker,
             final String message,
             final Object... arguments) {
-        this(level, mdc, fromNullable(marker), Optional.<Throwable>absent(), message, arguments);
+        this(level, mdc, ofNullable(marker), Optional.<Throwable>empty(), message, arguments);
     }
 
     public LoggingEvent(
@@ -297,7 +298,7 @@ public class LoggingEvent extends RichObject {
             final Throwable throwable,
             final String message,
             final Object... arguments) {
-        this(level, mdc, fromNullable(marker), fromNullable(throwable), message, arguments);
+        this(level, mdc, ofNullable(marker), ofNullable(throwable), message, arguments);
     }
 
     private LoggingEvent(
@@ -307,7 +308,7 @@ public class LoggingEvent extends RichObject {
             final Optional<Throwable> throwable,
             final String message,
             final Object... arguments) {
-        this(Optional.<TestLogger>absent(), level, mdc, marker, throwable, message, arguments);
+        this(Optional.<TestLogger>empty(), level, mdc, marker, throwable, message, arguments);
     }
 
     LoggingEvent(
@@ -320,37 +321,35 @@ public class LoggingEvent extends RichObject {
             final Object... arguments) {
         super();
         this.creatingLogger = creatingLogger;
-        this.level = checkNotNull(level);
-        this.mdc = ImmutableMap.copyOf(mdc);
-        this.marker = checkNotNull(marker);
-        this.throwable = checkNotNull(throwable);
-        this.message = checkNotNull(message);
-        this.arguments = from(asList(arguments)).transform(TO_NON_NULL_VALUE).toList();
+        this.level = requireNonNull(level);
+        this.mdc = Collections.unmodifiableMap(new HashMap<>(mdc));
+        this.marker = requireNonNull(marker);
+        this.throwable = requireNonNull(throwable);
+        this.message = requireNonNull(message);
+        if (arguments==null){
+            this.arguments = Collections.emptyList();
+        }
+        else{
+            this.arguments = Collections.unmodifiableList(asList(arguments).stream().map(x->x==null?Optional.empty():x).collect(Collectors.toList()));
+        }
     }
 
-    private static final Function<Object, Object> TO_NON_NULL_VALUE = new Function<Object, Object>() {
-        @Override
-        public Object apply(final Object input) {
-            return fromNullable(input).or((Object) absent());
-        }
-    };
-
-    @Identity private final Level level;
-    @Identity private final ImmutableMap<String, String> mdc;
-    @Identity private final Optional<Marker> marker;
-    @Identity private final Optional<Throwable> throwable;
-    @Identity private final String message;
-    @Identity private final ImmutableList<Object> arguments;
+    private final Level level;
+    private final Map<String, String> mdc;
+    private final Optional<Marker> marker;
+    private final Optional<Throwable> throwable;
+    private final String message;
+    private final List<Object> arguments;
 
     private final Optional<TestLogger> creatingLogger;
-    private final Instant timestamp = new Instant();
+    private final Instant timestamp = clock.get().instant();
     private final String threadName = Thread.currentThread().getName();
 
     public Level getLevel() {
         return level;
     }
 
-    public ImmutableMap<String, String> getMdc() {
+    public Map<String, String> getMdc() {
         return mdc;
     }
 
@@ -362,7 +361,7 @@ public class LoggingEvent extends RichObject {
         return message;
     }
 
-    public ImmutableList<Object> getArguments() {
+    public List<Object> getArguments() {
         return arguments;
     }
 
@@ -370,9 +369,35 @@ public class LoggingEvent extends RichObject {
         return throwable;
     }
 
+    @Override
+    public int hashCode(){
+        return Objects.hash(level,mdc,marker,throwable,message,arguments);
+    }
+
+    @Override
+    public boolean equals(Object other){
+        if (this==other) return true;
+        if (!(other instanceof LoggingEvent)) return false;
+        LoggingEvent that=(LoggingEvent)other;
+        Object[] ours={level,mdc,marker,throwable,message,arguments};
+        Object[] theirs={that.level,that.mdc,that.marker,that.throwable,that.message,that.arguments};
+        return Arrays.equals(ours,theirs);
+    }
+
+    @Override
+    public String toString(){
+        return "LoggingEvent"+
+            "[level="+level.toString()+
+            ",mdc="+mdc.toString()+
+            ",marker="+marker.toString()+
+            ",throwable="+throwable.toString()+
+            ",message="+message+
+            ",arguments"+arguments.toString()+"]";
+    }
+
     /**
      * @return the logger that created this logging event.
-     * @throws IllegalStateException if this logging event was not created by a logger
+     * @throws NoSuchElementException if this logging event was not created by a logger
      */
     public TestLogger getCreatingLogger() {
         return creatingLogger.get();
@@ -395,7 +420,7 @@ public class LoggingEvent extends RichObject {
     void print() {
         final PrintStream output = printStreamForLevel();
         output.println(formatLogStatement());
-        throwable.transform(printThrowableTo(output));
+        throwable.map(printThrowableTo(output));
     }
 
     private static Function<Throwable, String> printThrowableTo(final PrintStream output) {
@@ -408,12 +433,14 @@ public class LoggingEvent extends RichObject {
         };
     }
 
+    private final DateTimeFormatter timestampFormatter=DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'").withZone(ZoneOffset.UTC);
+
     private String formatLogStatement() {
-        return getTimestamp() + " [" + getThreadName() + "] " + getLevel() + safeLoggerName() + " - " + getFormattedMessage();
+        return timestampFormatter.format(getTimestamp()) + " [" + getThreadName() + "] " + getLevel() + safeLoggerName() + " - " + getFormattedMessage();
     }
 
     private String safeLoggerName() {
-        return creatingLogger.transform(toLoggerNameString).or("");
+        return creatingLogger.map(toLoggerNameString).orElse("");
     }
 
     private static final Function<TestLogger, String> toLoggerNameString = new Function<TestLogger, String>() {
@@ -435,5 +462,11 @@ public class LoggingEvent extends RichObject {
             default:
                 return System.out;
         }
+    }
+
+    private static ThreadLocal<Clock> clock=ThreadLocal.withInitial(Clock::systemUTC);
+
+    static void setClock(Clock clock){
+        LoggingEvent.clock.set(clock);
     }
 }

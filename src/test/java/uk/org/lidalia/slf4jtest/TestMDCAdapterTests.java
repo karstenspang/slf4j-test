@@ -34,6 +34,12 @@ public class TestMDCAdapterTests {
     }
 
     @Test
+    public void getKeys() {
+        testMDCAdapter.put(key, value);
+        assertEquals(Collections.singleton(key), testMDCAdapter.getKeys());
+    }
+
+    @Test
     @SuppressWarnings("raw type")
     public void getCopyOfContextMapIsCopy() {
         testMDCAdapter.put(key, value);

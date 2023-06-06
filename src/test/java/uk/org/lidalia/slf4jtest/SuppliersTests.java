@@ -1,9 +1,9 @@
 package uk.org.lidalia.slf4jtest;
 
-import com.google.common.base.Supplier;
-import com.google.common.collect.ImmutableMap;
+import java.util.function.Supplier;
 import org.junit.Test;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -45,7 +45,8 @@ public class SuppliersTests {
     public void makeEmptyMutableMapMakesAMutableMap() {
         Map<String, String> map = Suppliers.<String, String>makeEmptyMutableMap().get();
         map.put("key", "value");
-        Map<String, String> expected = ImmutableMap.of("key", "value");
+        Map<String, String> expected = new HashMap<>();
+        expected.put("key", "value");
         assertThat(map, is(expected));
     }
 

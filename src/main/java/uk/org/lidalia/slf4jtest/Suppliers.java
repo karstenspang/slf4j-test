@@ -1,11 +1,10 @@
 package uk.org.lidalia.slf4jtest;
 
-import com.google.common.base.Supplier;
-
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Supplier;
 
 final class Suppliers {
 

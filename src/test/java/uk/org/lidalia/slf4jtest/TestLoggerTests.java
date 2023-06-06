@@ -1,10 +1,13 @@
 package uk.org.lidalia.slf4jtest;
 
 import java.util.Collections;
+import java.util.EnumMap;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.commons.lang3.RandomStringUtils;
@@ -15,33 +18,26 @@ import org.junit.Test;
 import org.slf4j.MDC;
 import org.slf4j.Marker;
 
-import com.google.common.base.Function;
-import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Lists;
-
-import uk.org.lidalia.slf4jext.Level;
 import uk.org.lidalia.slf4jext.Logger;
+import org.slf4j.event.Level;
 import uk.org.lidalia.test.SystemOutputRule;
 
-import static com.google.common.collect.Sets.difference;
-import static com.google.common.collect.Sets.newHashSet;
 import static java.util.Arrays.asList;
 import static java.util.Collections.EMPTY_LIST;
 import static org.hamcrest.CoreMatchers.containsString;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.isEmptyString;
+import static org.hamcrest.Matchers.nullValue;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
-import static uk.org.lidalia.slf4jext.Level.DEBUG;
-import static uk.org.lidalia.slf4jext.Level.ERROR;
-import static uk.org.lidalia.slf4jext.Level.INFO;
-import static uk.org.lidalia.slf4jext.Level.TRACE;
-import static uk.org.lidalia.slf4jext.Level.WARN;
-import static uk.org.lidalia.slf4jext.Level.enablableValueSet;
+import static org.slf4j.event.Level.DEBUG;
+import static org.slf4j.event.Level.ERROR;
+import static org.slf4j.event.Level.INFO;
+import static org.slf4j.event.Level.TRACE;
+import static org.slf4j.event.Level.WARN;
 import static uk.org.lidalia.slf4jtest.LoggingEvent.debug;
 import static uk.org.lidalia.slf4jtest.LoggingEvent.error;
 import static uk.org.lidalia.slf4jtest.LoggingEvent.info;
@@ -61,6 +57,17 @@ public class TestLoggerTests {
     private final Object[] argsWithThrowable = new Object[]{arg1, arg2, "arg3", throwable};
 
     private final Map<String, String> mdcValues = new HashMap<>();
+    
+    private final static Map<Level,uk.org.lidalia.slf4jext.Level> levelMap;
+    static{
+        Map<Level,uk.org.lidalia.slf4jext.Level> map=new EnumMap<>(Level.class);
+        map.put(ERROR,uk.org.lidalia.slf4jext.Level.ERROR);
+        map.put(WARN ,uk.org.lidalia.slf4jext.Level.WARN );
+        map.put(INFO ,uk.org.lidalia.slf4jext.Level.INFO );
+        map.put(DEBUG,uk.org.lidalia.slf4jext.Level.DEBUG);
+        map.put(TRACE,uk.org.lidalia.slf4jext.Level.TRACE);
+        levelMap=Collections.unmodifiableMap(map);
+    }
 
     @Rule public SystemOutputRule systemOutputRule = new SystemOutputRule();
 
@@ -75,7 +82,7 @@ public class TestLoggerTests {
     public void tearDown() {
         MDC.clear();
         TestLoggerFactory.reset();
-        TestLoggerFactory.getInstance().setPrintLevel(Level.OFF);
+        TestLoggerFactory.getInstance().setPrintLevel(null);
     }
 
     @Test
@@ -98,7 +105,7 @@ public class TestLoggerTests {
     public void clearResetsLevel() {
         testLogger.setEnabledLevels();
         testLogger.clear();
-        assertEquals(newHashSet(TRACE, DEBUG, INFO, WARN, ERROR), testLogger.getEnabledLevels());
+        assertEquals(EnumSet.of(TRACE, DEBUG, INFO, WARN, ERROR), testLogger.getEnabledLevels());
     }
 
     @Test
@@ -609,12 +616,7 @@ public class TestLoggerTests {
         testLogger.debug(message);
         testLogger.trace(message);
 
-        List<LoggingEvent> expectedEvents = Lists.transform(asList(shouldLog), new Function<Level, LoggingEvent>() {
-            @Override
-            public LoggingEvent apply(Level level) {
-                return new LoggingEvent(level, mdcValues, message);
-            }
-        });
+        List<LoggingEvent> expectedEvents = asList(shouldLog).stream().map(level->new LoggingEvent(level, mdcValues, message)).collect(Collectors.toList());
 
         assertEquals(expectedEvents, testLogger.getLoggingEvents());
         testLogger.clear();
@@ -653,6 +655,7 @@ public class TestLoggerTests {
         Thread t = new Thread(new Runnable() {
             @Override
             public void run() {
+                MDC.clear();
                 testLogger.info(message);
             }
         });
@@ -667,6 +670,7 @@ public class TestLoggerTests {
         Thread t = new Thread(new Runnable() {
             @Override
             public void run() {
+                MDC.clear();
                 testLogger.info(message);
             }
         });
@@ -694,7 +698,7 @@ public class TestLoggerTests {
 
     @Test
     public void setEnabledLevelOnlyChangesLevelForCurrentThread() throws Exception {
-        final AtomicReference<ImmutableSet<Level>> inThreadEnabledLevels = new AtomicReference<ImmutableSet<Level>>();
+        final AtomicReference<Set<Level>> inThreadEnabledLevels = new AtomicReference<Set<Level>>();
         Thread t = new Thread(new Runnable() {
             @Override
             public void run() {
@@ -704,8 +708,8 @@ public class TestLoggerTests {
         });
         t.start();
         t.join();
-        assertEquals(ImmutableSet.of(Level.WARN, Level.ERROR), inThreadEnabledLevels.get());
-        assertEquals(Level.enablableValueSet(), testLogger.getEnabledLevels());
+        assertEquals(EnumSet.of(Level.WARN, Level.ERROR), inThreadEnabledLevels.get());
+        assertEquals(EnumSet.allOf(Level.class), testLogger.getEnabledLevels());
     }
 
     @Test
@@ -719,12 +723,12 @@ public class TestLoggerTests {
         });
         t.start();
         t.join();
-        assertEquals(ImmutableSet.of(Level.WARN, Level.ERROR), testLogger.getEnabledLevels());
+        assertEquals(EnumSet.of(Level.WARN, Level.ERROR), testLogger.getEnabledLevels());
     }
 
     @Test
     public void setEnabledLevelsForAllThreads() throws Exception {
-        final AtomicReference<ImmutableSet<Level>> inThreadEnabledLevels = new AtomicReference<ImmutableSet<Level>>();
+        final AtomicReference<Set<Level>> inThreadEnabledLevels = new AtomicReference<Set<Level>>();
         Thread t = new Thread(new Runnable() {
             @Override
             public void run() {
@@ -734,8 +738,8 @@ public class TestLoggerTests {
         });
         t.start();
         t.join();
-        assertEquals(ImmutableSet.of(Level.WARN, Level.ERROR), inThreadEnabledLevels.get());
-        assertEquals(ImmutableSet.of(Level.WARN, Level.ERROR), testLogger.getEnabledLevels());
+        assertEquals(EnumSet.of(Level.WARN, Level.ERROR), inThreadEnabledLevels.get());
+        assertEquals(EnumSet.of(Level.WARN, Level.ERROR), testLogger.getEnabledLevels());
     }
 
     @Test
@@ -749,7 +753,7 @@ public class TestLoggerTests {
         });
         t.start();
         t.join();
-        assertEquals(Level.enablableValueSet(), testLogger.getEnabledLevels());
+        assertEquals(EnumSet.allOf(Level.class), testLogger.getEnabledLevels());
     }
 
     @Test
@@ -785,31 +789,39 @@ public class TestLoggerTests {
         MDC.put("key", null);
 
         testLogger.info(message);
+        
+        Map<String,String> expected=new HashMap<>();
+        expected.put("key", "null");
 
-        assertThat(testLogger.getLoggingEvents(), is(asList(info(ImmutableMap.of("key", "null"), message))));
+        assertThat(testLogger.getLoggingEvents(), is(asList(info(expected, message))));
+    }
+    
+    @Test
+    public void getFullyQualifiedCallerNameIsNull(){
+        assertThat(TestLoggerFactory.getTestLogger("x").getFullyQualifiedCallerName(),is(nullValue()));
     }
 
     private void assertEnabledReturnsCorrectly(Level levelToTest) {
         testLogger.setEnabledLevels(levelToTest);
         assertTrue("Logger level set to " + levelToTest + " means " + levelToTest + " should be enabled",
-                new Logger(testLogger).isEnabled(levelToTest));
+                new Logger(testLogger).isEnabled(levelMap.get(levelToTest)));
 
-        Set<Level> disabledLevels = difference(enablableValueSet(), newHashSet(levelToTest));
+        Set<Level> disabledLevels = EnumSet.complementOf(EnumSet.of(levelToTest));
         for (Level disabledLevel: disabledLevels) {
             assertFalse("Logger level set to " + levelToTest + " means " + levelToTest + " should be disabled",
-                    new Logger(testLogger).isEnabled(disabledLevel));
+                    new Logger(testLogger).isEnabled(levelMap.get(disabledLevel)));
         }
     }
 
     private void assertEnabledReturnsCorrectly(Level levelToTest, Marker marker) {
         testLogger.setEnabledLevels(levelToTest);
         assertTrue("Logger level set to " + levelToTest + " means " + levelToTest + " should be enabled",
-                new Logger(testLogger).isEnabled(levelToTest, marker));
+                new Logger(testLogger).isEnabled(levelMap.get(levelToTest), marker));
 
-        Set<Level> disabledLevels = difference(enablableValueSet(), newHashSet(levelToTest));
+        Set<Level> disabledLevels = EnumSet.complementOf(EnumSet.of(levelToTest));
         for (Level disabledLevel: disabledLevels) {
             assertFalse("Logger level set to " + levelToTest + " means " + levelToTest + " should be disabled",
-                    new Logger(testLogger).isEnabled(disabledLevel, marker));
+                    new Logger(testLogger).isEnabled(levelMap.get(disabledLevel), marker));
         }
     }
 }

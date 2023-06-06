@@ -1,54 +1,59 @@
 package uk.org.lidalia.slf4jtest;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import org.hamcrest.Matcher;
 import org.junit.After;
+import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.slf4j.Marker;
+import org.slf4j.event.Level;
 
-import com.google.common.base.Optional;
-import com.google.common.collect.ImmutableMap;
 import junitparams.JUnitParamsRunner;
 import junitparams.Parameters;
 
-import uk.org.lidalia.slf4jext.Level;
 import uk.org.lidalia.test.StaticTimeRule;
 import uk.org.lidalia.test.SystemOutputRule;
 
-import static com.google.common.base.Optional.absent;
-import static com.google.common.base.Optional.of;
+import static java.util.Optional.empty;
+import static java.util.Optional.of;
 import static java.lang.System.lineSeparator;
 import static java.util.Arrays.asList;
+import static org.hamcrest.Matchers.nullValue;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.startsWith;
 import static org.hamcrest.core.Is.is;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThat;
+import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
-import static uk.org.lidalia.slf4jext.Level.DEBUG;
-import static uk.org.lidalia.slf4jext.Level.ERROR;
-import static uk.org.lidalia.slf4jext.Level.INFO;
-import static uk.org.lidalia.slf4jext.Level.TRACE;
-import static uk.org.lidalia.slf4jext.Level.WARN;
+import static org.slf4j.event.Level.DEBUG;
+import static org.slf4j.event.Level.ERROR;
+import static org.slf4j.event.Level.INFO;
+import static org.slf4j.event.Level.TRACE;
+import static org.slf4j.event.Level.WARN;
 import static uk.org.lidalia.slf4jtest.LoggingEvent.debug;
 import static uk.org.lidalia.slf4jtest.LoggingEvent.error;
 import static uk.org.lidalia.slf4jtest.LoggingEvent.info;
 import static uk.org.lidalia.slf4jtest.LoggingEvent.trace;
 import static uk.org.lidalia.slf4jtest.LoggingEvent.warn;
-import static uk.org.lidalia.test.StaticTimeRule.alwaysStartOfEpoch;
 
 @RunWith(JUnitParamsRunner.class)
 public class LoggingEventTests {
 
-    private static final ImmutableMap<String, String> emptyMap = ImmutableMap.of();
+    private static final Map<String, String> emptyMap = Collections.emptyMap();
 
     @Rule public SystemOutputRule systemOutputRule = new SystemOutputRule();
-    @Rule public StaticTimeRule alwaysStartOfEpoch = alwaysStartOfEpoch();
 
     Level level = Level.TRACE;
     Map<String, String> mdc = new HashMap<>();
@@ -467,10 +472,10 @@ public class LoggingEventTests {
     @Test
     public void timestamp() {
         LoggingEvent event = info("Message");
-        assertThat(event.getTimestamp(), is(alwaysStartOfEpoch.getInstant()));
+        assertThat(event.getTimestamp(), is(Instant.EPOCH));
     }
 
-    @Test(expected = IllegalStateException.class)
+    @Test(expected = java.util.NoSuchElementException.class)
     public void creatingLoggerNotPresent() {
         info("message").getCreatingLogger();
     }
@@ -525,17 +530,48 @@ public class LoggingEventTests {
     @Test
     public void nullArgument() {
         LoggingEvent event = new LoggingEvent(level, "message with null arg", null, null);
-        assertThat(event, is(new LoggingEvent(level, "message with null arg", absent(), absent())));
+        assertThat(event, is(new LoggingEvent(level, "message with null arg", empty(), empty())));
+    }
+
+    @Test
+    public void nullIsNotEqual() {
+        LoggingEvent event = new LoggingEvent(level, "message with null arg", null, null);
+        assertFalse(event.equals(null));
+    }
+
+    @Test
+    public void sameIsEqual() {
+        LoggingEvent event = new LoggingEvent(level, "message with null arg", null, null);
+        assertTrue(event.equals(event));
+    }
+
+    @Test
+    public void sameHash() {
+        LoggingEvent event1 = new LoggingEvent(level, "message with null arg", null, null);
+        LoggingEvent event2 = new LoggingEvent(level, "message with null arg", null, null);
+        assertThat(event2.hashCode(),is(event1.hashCode()));
+    }
+
+    @Test
+    public void toStringIsNotNull() {
+        LoggingEvent event = new LoggingEvent(level, "message with null arg", null, null);
+        assertThat(event.toString(), is(not(nullValue())));
+    }
+
+    @Before
+    public void setClock() {
+        LoggingEvent.setClock(Clock.fixed(Instant.EPOCH,ZoneOffset.UTC));
     }
 
     @After
     public void reset() {
         TestLoggerFactory.reset();
+        LoggingEvent.setClock(Clock.systemUTC());
     }
 
     @SuppressWarnings("unchecked")
     private Matcher<Optional<?>> isAbsent() {
-        final Matcher optionalMatcher = is(Optional.absent());
+        final Matcher optionalMatcher = is(Optional.empty());
         return (Matcher<Optional<?>>) optionalMatcher;
     }
 }

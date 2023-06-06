@@ -1,6 +1,7 @@
 package uk.org.lidalia.slf4jtest;
 
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.List;
 
 import org.junit.After;
@@ -9,17 +10,15 @@ import org.junit.Test;
 import org.junit.runner.Description;
 import org.junit.runners.model.Statement;
 
-import uk.org.lidalia.lang.Task;
-import uk.org.lidalia.slf4jext.Level;
+import org.slf4j.event.Level;
 
 import static java.util.Arrays.asList;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.core.Is.is;
-import static uk.org.lidalia.lang.Exceptions.throwUnchecked;
-import static uk.org.lidalia.slf4jext.Level.DEBUG;
-import static uk.org.lidalia.slf4jext.Level.INFO;
+import static org.junit.Assert.fail;
+import static org.slf4j.event.Level.DEBUG;
+import static org.slf4j.event.Level.INFO;
 import static uk.org.lidalia.slf4jtest.LoggingEvent.info;
-import static uk.org.lidalia.test.ShouldThrow.shouldThrow;
 
 public class TestLoggerFactoryResetRuleUnitTests {
 
@@ -37,7 +36,7 @@ public class TestLoggerFactoryResetRuleUnitTests {
             public void evaluate() throws Throwable {
             	assertThat(TestLoggerFactory.getLoggingEvents(), is(Collections.<LoggingEvent>emptyList()));
             	assertThat(logger.getLoggingEvents(), is(Collections.<LoggingEvent>emptyList()));
-            	assertThat(logger.getEnabledLevels(), is(Level.enablableValueSet()));
+            	assertThat(logger.getEnabledLevels(), is(EnumSet.allOf(Level.class)));
             }
         }, Description.EMPTY).evaluate();
     }
@@ -58,7 +57,7 @@ public class TestLoggerFactoryResetRuleUnitTests {
 
         assertThat(TestLoggerFactory.getLoggingEvents(), is(Collections.<LoggingEvent>emptyList()));
         assertThat(logger.getLoggingEvents(), is(Collections.<LoggingEvent>emptyList()));
-        assertThat(logger.getEnabledLevels(), is(Level.enablableValueSet()));
+        assertThat(logger.getEnabledLevels(), is(EnumSet.allOf(Level.class)));
     }
 
     @Test
@@ -69,26 +68,23 @@ public class TestLoggerFactoryResetRuleUnitTests {
         logger.info("a message");
 
         final Exception toThrow = new Exception();
-        Exception thrown = shouldThrow(Exception.class, new Task() {
-            @Override
-            public void perform() throws Exception {
-                try {
-                    resetRule.apply(new Statement() {
-                        @Override
-                        public void evaluate() throws Throwable {
-                            throw toThrow;
-                        }
-                    }, Description.EMPTY).evaluate();
-                } catch (Throwable throwable) {
-                    throwUnchecked(throwable);
+        Exception thrown=null;
+        try{
+            resetRule.apply(new Statement() {
+                @Override
+                public void evaluate() throws Throwable {
+                    throw toThrow;
                 }
-            }
-        });
-
+            }, Description.EMPTY).evaluate();
+            fail("No exception thrown");
+        }
+        catch(Exception e){
+            thrown=e;
+        }
         assertThat(thrown, is(toThrow));
         assertThat(TestLoggerFactory.getLoggingEvents(), is(Collections.<LoggingEvent>emptyList()));
         assertThat(logger.getLoggingEvents(), is(Collections.<LoggingEvent>emptyList()));
-        assertThat(logger.getEnabledLevels(), is(Level.enablableValueSet()));
+        assertThat(logger.getEnabledLevels(), is(EnumSet.allOf(Level.class)));
     }
 
     @Test
